@@ -28,7 +28,7 @@
 #include <socket.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <sys/wait.h>
+#include <wait.h>
 #include <ioctl_abi.h>
 
 #define CONFIG_PATH "/etc/networkd.conf"
