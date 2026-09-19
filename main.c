@@ -11,7 +11,7 @@
  *
  * Ядро DHCP-клиент не содержит: вся адресация приходит из юзерспейса.
  *
- * /etc/networkd.conf (все ключи необязательны):
+ * /etc/networkd.conf (все ключи необязательны; создаётся при первом запуске):
  *   interface=eth0
  *   dhcp=yes|no
  *   address=10.0.2.15/24
@@ -106,11 +106,37 @@ static int yesno(const char *v) {
     return 0;
 }
 
+/* Конфиг по умолчанию: пишется при первом запуске, если файла ещё нет. */
+static const char default_config[] =
+    "# networkd config - auto-generated on first start.\n"
+    "#\n"
+    "# interface - интерфейс (в CactOS карта одна)\n"
+    "# dhcp      - yes|no; при no применяются address/gateway/dns\n"
+    "\n"
+    "interface=eth0\n"
+    "dhcp=yes\n"
+    "\n"
+    "# только для dhcp=no:\n"
+    "#address=10.0.2.15/24\n"
+    "#gateway=10.0.2.2\n"
+    "#dns=8.8.8.8\n";
+
+static void config_write_default(void) {
+    int fd = open(CONFIG_PATH, O_WRONLY | O_CREAT | O_EXCL, 0644);
+    if (fd < 0) return;
+    write(fd, default_config, sizeof(default_config) - 1);
+    close(fd);
+}
+
 static void config_load(netconf_t *c) {
     FILE *f = fopen(CONFIG_PATH, "r");
     if (!f) {
-        printf("networkd: no %s, using DHCP on %s\n", CONFIG_PATH, c->iface);
-        return;
+        config_write_default();
+        f = fopen(CONFIG_PATH, "r");
+        if (!f) {
+            printf("networkd: no %s, using DHCP on %s\n", CONFIG_PATH, c->iface);
+            return;
+        }
     }
     char line[160];
     while (fgets(line, sizeof(line), f)) {
