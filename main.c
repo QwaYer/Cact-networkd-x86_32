@@ -1,17 +1,17 @@
 /*
- * networkd — сетевой менеджер CactOS (упрощённый аналог systemd-networkd).
+ * networkd — network manager for CactOS (simplified analog of systemd-networkd).
  *
- * Запускается при загрузке (обычно из init), ждёт появления сетевой карты и
- * приводит её в рабочее состояние:
+ * Started at boot (usually from init), waits for the network card to appear and
+ * brings it into a working state:
  *
- *   - если в /etc/networkd.conf указано dhcp=no  — применяет статический
- *     адрес (address/gateway/dns) через /dev/net CACT_NETCTL_NETCFG;
- *   - если dhcp=yes (по умолчанию) — поддерживает живым /sbin/dhcpd
- *     (отдельный репозиторий Cact-dhcpd-x86_32), перезапуская его при сбое.
+ *   - if /etc/networkd.conf says dhcp=no  — applies a static
+ *     address (address/gateway/dns) via /dev/net CACT_NETCTL_NETCFG;
+ *   - if dhcp=yes (the default) — keeps /sbin/dhcpd alive
+ *     (a separate repository, Cact-dhcpd-x86_32), restarting it on failure.
  *
- * Ядро DHCP-клиент не содержит: вся адресация приходит из юзерспейса.
+ * The kernel contains no DHCP client: all addressing comes from userspace.
  *
- * /etc/networkd.conf (все ключи необязательны; создаётся при первом запуске):
+ * /etc/networkd.conf (all keys optional; created on first start):
  *   interface=eth0
  *   dhcp=yes|no
  *   address=10.0.2.15/24
@@ -39,8 +39,8 @@
 typedef struct {
     char     iface[32];
     int      dhcp;           /* 1 = DHCP (default), 0 = static */
-    uint32_t address_host;   /* 0 = не задан */
-    uint32_t netmask_host;   /* 0 = не задан */
+    uint32_t address_host;   /* 0 = not set */
+    uint32_t netmask_host;   /* 0 = not set */
     uint32_t gateway_host;
     uint32_t dns_host;
 } netconf_t;
@@ -75,7 +75,7 @@ static int parse_ipv4(const char *s, uint32_t *out) {
     return 0;
 }
 
-/* "A.B.C.D" или "A.B.C.D/prefix" -> адрес и префикс (по умолчанию 24). */
+/* "A.B.C.D" or "A.B.C.D/prefix" -> address and prefix (default 24). */
 static int parse_address(const char *s, uint32_t *ip, int *prefix) {
     char tmp[32];
     int n = 0;
@@ -106,17 +106,17 @@ static int yesno(const char *v) {
     return 0;
 }
 
-/* Конфиг по умолчанию: пишется при первом запуске, если файла ещё нет. */
+/* Default config: written on first start if the file does not exist yet. */
 static const char default_config[] =
     "# networkd config - auto-generated on first start.\n"
     "#\n"
-    "# interface - интерфейс (в CactOS карта одна)\n"
-    "# dhcp      - yes|no; при no применяются address/gateway/dns\n"
+    "# interface - interface (CactOS has a single card)\n"
+    "# dhcp      - yes|no; with no, address/gateway/dns are applied\n"
     "\n"
     "interface=eth0\n"
     "dhcp=yes\n"
     "\n"
-    "# только для dhcp=no:\n"
+    "# only for dhcp=no:\n"
     "#address=10.0.2.15/24\n"
     "#gateway=10.0.2.2\n"
     "#dns=8.8.8.8\n";
@@ -230,7 +230,7 @@ static int net_apply_static(const netconf_t *c) {
     return r;
 }
 
-/* ждать, пока появится карта (link_up), с логом */
+/* wait for the card to appear (link_up), with logging */
 static void wait_link_up(const char *iface) {
     cact_netcfg_get_t g;
     for (;;) {
@@ -245,7 +245,7 @@ static void wait_link_up(const char *iface) {
     }
 }
 
-/* DHCP-режим: держим /sbin/dhcpd живым */
+/* DHCP mode: keep /sbin/dhcpd alive */
 static void run_dhcp_mode(void) {
     for (;;) {
         pid_t pid = fork();
@@ -255,7 +255,7 @@ static void run_dhcp_mode(void) {
             continue;
         }
         if (pid == 0) {
-            /* ребёнок: сам dhcpd */
+            /* child: dhcpd itself */
             char *args[] = { (char *)DHCPD_PATH, 0 };
             execvp(DHCPD_PATH, args);
             printf("networkd: cannot exec %s\n", DHCPD_PATH);
@@ -269,7 +269,7 @@ static void run_dhcp_mode(void) {
     }
 }
 
-/* Статический режим: применить и держать конфиг */
+/* Static mode: apply and keep the config */
 static void run_static_mode(const netconf_t *c) {
     if (net_apply_static(c) != 0) {
         printf("networkd: failed to apply static config (root needed?)\n");
